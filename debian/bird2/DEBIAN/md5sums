@@ -1,0 +1,14 @@
+2c366cd27077842b6f820a9c59fd4084  lib/systemd/system/bird.service
+b510c2d5b83a822b1f89ab52aca4fa08  usr/lib/bird/prepare-environment
+1e3d9c1b082ffad78d21002e22ab7eb3  usr/sbin/bird
+b65bfda344ff33d8c9694b6fad4f81a3  usr/sbin/birdc
+165e18ed46f9e35599b7e72647a21d34  usr/sbin/birdcl
+cd5fe4f7a2cfec4850aae926c1724c7f  usr/share/bird2/bird.conf
+961bf49ed3fa0ddb7fddb6b161e67db4  usr/share/doc/bird2/NEWS.Debian.gz
+cc7d8e96278a5145b75dd4c5a28ad23b  usr/share/doc/bird2/NEWS.gz
+60ba8c4d8a2aa4076b84039a8cb40727  usr/share/doc/bird2/README.gz
+24f1b535800973709f788479587711f0  usr/share/doc/bird2/changelog.Debian.gz
+d945eee6d0dbbc0476e0b66b7fc537d8  usr/share/doc/bird2/changelog.gz
+e19a434e92304980581feb8ca4280cf2  usr/share/doc/bird2/copyright
+d3e5e48fdd05eca86c471976303076a3  usr/share/lintian/overrides/bird2
+0b7d7f56b278d6f56f312c56217c5549  usr/share/man/man8/bird.8.gz

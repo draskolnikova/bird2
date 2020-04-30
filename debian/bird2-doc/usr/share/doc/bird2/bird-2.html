@@ -1,0 +1,206 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="LinuxDoc-Tools 1.0.9">
+ <TITLE>BIRD 2.0 User's Guide: Architecture</TITLE>
+ <LINK HREF="bird-3.html" REL=next>
+ <LINK HREF="bird-1.html" REL=previous>
+ <LINK HREF="bird.html#toc2" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="bird-3.html">Next</A>
+<A HREF="bird-1.html">Previous</A>
+<A HREF="bird.html#toc2">Contents</A>
+<HR>
+<H2><A NAME="architecture"></A> <A NAME="s2">2.</A> <A HREF="bird.html#toc2">Architecture</A></H2>
+
+<H2><A NAME="routing-tables"></A> <A NAME="ss2.1">2.1</A> <A HREF="bird.html#toc2.1">Routing tables</A>
+</H2>
+
+<P>The heart of BIRD is a routing table. BIRD has several independent routing tables;
+each of them contains routes of exactly one <I>nettype</I> (see below). There are two
+default tables -- <CODE>master4</CODE> for IPv4 routes and <CODE>master6</CODE> for IPv6 routes.
+Other tables must be explicitly configured.
+<P>
+<P>These routing tables are not kernel forwarding tables. No forwarding is done by
+BIRD. If you want to forward packets using the routes in BIRD tables, you may
+use the Kernel protocol (see below) to synchronize them with kernel FIBs.
+<P>
+<P>Every nettype defines a (kind of) primary key on routes. Every route source can
+supply one route for every possible primary key; new route announcement replaces
+the old route from the same source, keeping other routes intact. BIRD always
+chooses the best route for each primary key among the known routes and keeps the
+others as suboptimal. When the best route is retracted, BIRD re-runs the best
+route selection algorithm to find the current best route.
+<P>
+<P>The global best route selection algorithm is (roughly) as follows:
+<P>
+<UL>
+<LI>Preferences of the routes are compared.</LI>
+<LI>Source protocol instance preferences are compared.</LI>
+<LI>If source protocols are the same (e.g. BGP vs. BGP), the protocol's route selection algorithm is invoked.</LI>
+<LI>If source protocols are different (e.g. BGP vs. OSPF), result of the algorithm is undefined.</LI>
+</UL>
+<P>
+<P>
+<A NAME="dsc-table-sorted"></A> Usually, a routing table just chooses a selected
+route from a list of entries for one network. But if the <CODE>sorted</CODE> option is
+activated, these lists of entries are kept completely sorted (according to
+preference or some protocol-dependent metric). This is needed for some features
+of some protocols (e.g. <CODE>secondary</CODE> option of BGP protocol, which allows to
+accept not just a selected route, but the first route (in the sorted list) that
+is accepted by filters), but it is incompatible with some other features (e.g.
+<CODE>deterministic med</CODE> option of BGP protocol, which activates a way of choosing
+selected route that cannot be described using comparison and ordering). Minor
+advantage is that routes are shown sorted in <CODE>show route</CODE>, minor disadvantage
+is that it is slightly more computationally expensive.
+<P>
+<H2><A NAME="routes"></A> <A NAME="ss2.2">2.2</A> <A HREF="bird.html#toc2.2">Routes and network types</A>
+</H2>
+
+<P>BIRD works with several types of routes. Some of them are typical IP routes,
+others are better described as forwarding rules. We call them all routes,
+regardless of this difference.
+<P>
+<P>Every route consists of several attributes (read more about them in the
+<A HREF="bird-5.html#route-attributes">Route attributes</A> section); the common for all
+routes are:
+<P>
+<UL>
+<LI>IP address of router which told us about this route</LI>
+<LI>Source protocol instance</LI>
+<LI>Route preference</LI>
+<LI>Optional attributes defined by protocols</LI>
+</UL>
+<P>
+<P>Other attributes depend on nettypes. Some of them are part of the primary key, these are marked (PK).
+<P>
+<H3><A NAME="ip-routes"></A> IPv4 and IPv6 routes</H3>
+
+<P>The traditional routes. Configuration keywords are <CODE>ipv4</CODE> and <CODE>ipv6</CODE>.
+<P>
+<UL>
+<LI>(PK) Route destination (IP prefix together with its length)</LI>
+<LI>Route next hops (see below)</LI>
+</UL>
+<P>
+<H3><A NAME="ip-sadr-routes"></A> IPv6 source-specific routes</H3>
+
+<P>The IPv6 routes containing both destination and source prefix. They are used
+for source-specific routing (SSR), also called source-address dependent routing
+(SADR), see <A HREF="http://www.rfc-editor.org/info/rfc8043">RFC 8043</A>. Currently limited mostly to the Babel protocol.
+Configuration keyword is <CODE>ipv6 sadr</CODE>.
+<P>
+<UL>
+<LI>(PK) Route destination (IP prefix together with its length)</LI>
+<LI>(PK) Route source (IP prefix together with its length)</LI>
+<LI>Route next hops (see below)</LI>
+</UL>
+<P>
+<H3><A NAME="vpn-routes"></A> VPN IPv4 and IPv6 routes</H3>
+
+<P>Routes for IPv4 and IPv6 with VPN Route Distinguisher (<A HREF="http://www.rfc-editor.org/info/rfc4364">RFC 4364</A>).
+Configuration keywords are <CODE>vpn4</CODE> and <CODE>vpn6</CODE>.
+<P>
+<UL>
+<LI>(PK) Route destination (IP prefix together with its length)</LI>
+<LI>(PK) Route distinguisher (according to <A HREF="http://www.rfc-editor.org/info/rfc4364">RFC 4364</A>)</LI>
+<LI>Route next hops</LI>
+</UL>
+<P>
+<H3><A NAME="roa-routes"></A> Route Origin Authorization for IPv4 and IPv6</H3>
+
+<P>These entries can be used to validate route origination of BGP routes.
+A ROA entry specifies prefixes which could be originated by an AS number.
+Their keywords are <CODE>roa4</CODE> and <CODE>roa6</CODE>.
+<P>
+<UL>
+<LI>(PK) IP prefix together with its length</LI>
+<LI>(PK) Matching prefix maximal length</LI>
+<LI>(PK) AS number</LI>
+</UL>
+<P>
+<H3><A NAME="flow-routes"></A> Flowspec for IPv4 and IPv6</H3>
+
+<P>Flowspec rules are a form of firewall and traffic flow control rules
+distributed mostly via BGP. These rules may help the operators stop various
+network attacks in the beginning before eating up the whole bandwidth.
+Configuration keywords are <CODE>flow4</CODE> and <CODE>flow6</CODE>.
+<P>
+<UL>
+<LI>(PK) IP prefix together with its length</LI>
+<LI>(PK) Flow definition data</LI>
+<LI>Flow action (encoded internally as BGP communities according to <A HREF="http://www.rfc-editor.org/info/rfc5575">RFC 5575</A>)</LI>
+</UL>
+<P>
+<H3><A NAME="mpls-routes"></A> MPLS switching rules</H3>
+
+<P>This nettype is currently a stub before implementing more support of <A HREF="http://www.rfc-editor.org/info/rfc3031">RFC 3031</A>.
+BIRD currently does not support any label distribution protocol nor any label assignment method.
+Only the Kernel, Pipe and Static protocols can use MPLS tables.
+Configuration keyword is <CODE>mpls</CODE>.
+<P>
+<UL>
+<LI>(PK) MPLS label</LI>
+<LI>Route next hops</LI>
+</UL>
+<P>
+<H3><A NAME="route-next-hop"></A> Route next hops</H3>
+
+<P>This is not a nettype. The route next hop is a complex attribute common for many
+nettypes as you can see before. Every next hop has its assigned device
+(either assumed from its IP address or set explicitly). It may have also
+an IP address and an MPLS stack (one or both independently).
+Maximal MPLS stack depth is set (in compile time) to 8 labels.
+<P>
+<P>Every route (when eligible to have a next hop) can have more than one next hop.
+In that case, every next hop has also its weight.
+<P>
+<H2><A NAME="protocols-concept"></A> <A NAME="ss2.3">2.3</A> <A HREF="bird.html#toc2.3">Protocols and channels</A>
+</H2>
+
+<P>BIRD protocol is an abstract class of producers and consumers of the routes.
+Each protocol may run in multiple instances and bind on one side to route
+tables via channels, on the other side to specified listen sockets (BGP),
+interfaces (Babel, OSPF, RIP), APIs (Kernel, Direct), or nothing (Static, Pipe).
+<P>
+<P>There are also two protocols that do not have any channels -- BFD and Device.
+Both of them are kind of service for other protocols.
+<P>
+<P>Each protocol is connected to a routing table through a channel. Some protocols
+support only one channel (OSPF, RIP), some protocols support more channels (BGP, Direct).
+Each channel has two filters which can accept, reject and modify the routes.
+An <I>export</I> filter is applied to routes passed from the routing table to the protocol,
+an <I>import</I> filter is applied to routes in the opposite direction.
+<P>
+<H2><A NAME="graceful-restart"></A> <A NAME="ss2.4">2.4</A> <A HREF="bird.html#toc2.4">Graceful restart</A>
+</H2>
+
+<P>When BIRD is started after restart or crash, it repopulates routing tables in
+an uncoordinated manner, like after clean start. This may be impractical in some
+cases, because if the forwarding plane (i.e. kernel routing tables) remains
+intact, then its synchronization with BIRD would temporarily disrupt packet
+forwarding until protocols converge. Graceful restart is a mechanism that could
+help with this issue. Generally, it works by starting protocols and letting them
+repopulate routing tables while deferring route propagation until protocols
+acknowledge their convergence. Note that graceful restart behavior have to be
+configured for all relevant protocols and requires protocol-specific support
+(currently implemented for Kernel and BGP protocols), it is activated for
+particular boot by option <CODE>-R</CODE>.
+<P>
+<P>Some protocols (e.g. BGP) could be restarted gracefully after both
+intentional outage and crash, while others (e.g. OSPF) after intentional outage
+only. For planned graceful restart, BIRD must be shut down by
+<A HREF="bird-4.html#cli-graceful-restart">graceful restart</A> command instead of
+regular 
+<A HREF="bird-4.html#cli-down">down</A> command. In this way routing neighbors
+are notified about planned graceful restart and routes are kept in kernel table
+after shutdown.
+<P>
+<P>
+<HR>
+<A HREF="bird-3.html">Next</A>
+<A HREF="bird-1.html">Previous</A>
+<A HREF="bird.html#toc2">Contents</A>
+</BODY>
+</HTML>

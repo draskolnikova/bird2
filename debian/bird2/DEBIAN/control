@@ -1,0 +1,21 @@
+Package: bird2
+Version: 2.0.7-3~buster+xtremenitro
+Architecture: amd64
+Maintainer: Ondřej Surý <ondrej@debian.org>
+Installed-Size: 1313
+Pre-Depends: init-system-helpers (>= 1.56~)
+Depends: adduser, lsb-base, ucf, libc6 (>= 2.27), libreadline7 (>= 6.0), libssh-gcrypt-4 (>= 0.8.0), libtinfo6 (>= 6)
+Suggests: bird2-doc
+Conflicts: bird
+Section: net
+Priority: optional
+Homepage: https://bird.network.cz/
+Description: Internet Routing Daemon
+ BIRD is an Internet routing daemon with full support for all the major
+ routing protocols. It allows redistribution between protocols with a
+ powerful route filtering syntax and an easy-to-use configuration
+ interface.
+ .
+ BIRD supports IPv4 and IPv6 versions of OSPF, RIP, BGP and Babel routing
+ protocols. It also supports supplementary protocols like BFD, RPKI-Router
+ and IPv6 router advertisements.

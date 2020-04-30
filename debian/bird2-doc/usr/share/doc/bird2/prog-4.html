@@ -1,0 +1,297 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="LinuxDoc-Tools 1.0.9">
+ <TITLE>BIRD Programmer's Documentation: Filters</TITLE>
+ <LINK HREF="prog-5.html" REL=next>
+ <LINK HREF="prog-3.html" REL=previous>
+ <LINK HREF="prog.html#toc4" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="prog-5.html">Next</A>
+<A HREF="prog-3.html">Previous</A>
+<A HREF="prog.html#toc4">Contents</A>
+<HR>
+<H2><A NAME="s4">4.</A> <A HREF="prog.html#toc4">Filters</A></H2>
+
+<H2><A NAME="ss4.1">4.1</A> <A HREF="prog.html#toc4.1">Filters</A>
+</H2>
+
+<P>
+<P>You can find sources of the filter language in <CODE>filter/</CODE>
+directory. File <CODE>filter/config.Y</CODE> contains filter grammar and basically translates
+the source from user into a tree of <I>f_inst</I> structures. These trees are
+later interpreted using code in <CODE>filter/filter.c</CODE>.
+<P>A filter is represented by a tree of <I>f_inst</I> structures, later translated
+into lists called <I>f_line</I>. All the instructions are defined and documented
+in <CODE>filter/f-inst.c</CODE> definition file.
+<P>Filters use a <I>f_val</I> structure for their data. Each <I>f_val</I>
+contains type and value (types are constants prefixed with <I>T_</I>).
+Look into <CODE>filter/data.h</CODE> for more information and appropriate calls.
+<P>
+<P><HR><H3>Function</H3>
+<P><I>enum filter_return</I>
+<B>interpret</B>
+(<I>struct filter_state *</I> <B>fs</B>, <I>const struct f_line *</I> <B>line</B>, <I>struct f_val *</I> <B>val</B>)
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>struct filter_state *</I> <B>fs</B><DD><P>filter state
+<DT><I>const struct f_line *</I> <B>line</B><DD><P>-- undescribed --
+<DT><I>struct f_val *</I> <B>val</B><DD><P>-- undescribed --
+</DL>
+<H3>Description</H3>
+<P>Interpret given tree of filter instructions. This is core function
+of filter system and does all the hard work.
+<H3>Each instruction has 4 fields</H3>
+<P>code (which is instruction code),
+aux (which is extension to instruction code, typically type),
+arg1 and arg2 - arguments. Depending on instruction, arguments
+are either integers, or pointers to instruction trees. Common
+instructions like +, that have two expressions as arguments use
+TWOARGS macro to get both of them evaluated.
+
+
+<HR><H3>Function</H3>
+<P><I>enum filter_return</I>
+<B>f_run</B>
+(<I>const struct filter *</I> <B>filter</B>, <I>struct rte **</I> <B>rte</B>, <I>struct linpool *</I> <B>tmp_pool</B>, <I>int</I> <B>flags</B>) --     run a filter for a route
+<P>
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>const struct filter *</I> <B>filter</B><DD><P>filter to run
+<DT><I>struct rte **</I> <B>rte</B><DD><P>route being filtered, may be modified
+<DT><I>struct linpool *</I> <B>tmp_pool</B><DD><P>all filter allocations go from this pool
+<DT><I>int</I> <B>flags</B><DD><P>flags
+</DL>
+<H3>Description</H3>
+<P>If filter needs to modify the route, there are several
+posibilities. <B>rte</B> might be read-only (with REF_COW flag), in that
+case rw copy is obtained by <B>rte_cow()</B> and <B>rte</B> is replaced. If
+<B>rte</B> is originally rw, it may be directly modified (and it is never
+copied).
+<P>The returned rte may reuse the (possibly cached, cloned) rta, or
+(if rta was modified) contains a modified uncached rta, which
+uses parts allocated from <B>tmp_pool</B> and parts shared from original
+rta. There is one exception - if <B>rte</B> is rw but contains a cached
+rta and that is modified, rta in returned rte is also cached.
+<P>Ownership of cached rtas is consistent with rte, i.e.
+if a new rte is returned, it has its own clone of cached rta
+(and cached rta of read-only source rte is intact), if rte is
+modified in place, old cached rta is possibly freed.
+
+
+<HR><H3>Function</H3>
+<P><I>enum filter_return</I>
+<B>f_eval_rte</B>
+(<I>const struct f_line *</I> <B>expr</B>, <I>struct rte **</I> <B>rte</B>, <I>struct linpool *</I> <B>tmp_pool</B>) --     run a filter line for an uncached route
+<P>
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>const struct f_line *</I> <B>expr</B><DD><P>filter line to run
+<DT><I>struct rte **</I> <B>rte</B><DD><P>route being filtered, may be modified
+<DT><I>struct linpool *</I> <B>tmp_pool</B><DD><P>all filter allocations go from this pool
+</DL>
+<H3>Description</H3>
+<P>This specific filter entry point runs the given filter line
+(which must not have any arguments) on the given route.
+<P>The route MUST NOT have REF_COW set and its attributes MUST NOT
+be cached by <B>rta_lookup()</B>.
+
+
+<HR><H3>Function</H3>
+<P><I>int</I>
+<B>filter_same</B>
+(<I>const struct filter *</I> <B>new</B>, <I>const struct filter *</I> <B>old</B>) --     compare two filters
+<P>
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>const struct filter *</I> <B>new</B><DD><P>first filter to be compared
+<DT><I>const struct filter *</I> <B>old</B><DD><P>second filter to be compared
+</DL>
+<H3>Description</H3>
+<P>Returns 1 in case filters are same, otherwise 0. If there are
+underlying bugs, it will rather say 0 on same filters than say
+1 on different.
+
+
+<HR><H3>Function</H3>
+<P><I>void</I>
+<B>filter_commit</B>
+(<I>struct config *</I> <B>new</B>, <I>struct config *</I> <B>old</B>) --     do filter comparisons on all the named functions and filters
+<P>
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>struct config *</I> <B>new</B><DD><P>-- undescribed --
+<DT><I>struct config *</I> <B>old</B><DD><P>-- undescribed --
+</DL>
+
+
+<HR><H3>Function</H3>
+<P><I>struct f_tree *</I>
+<B>build_tree</B>
+(<I>struct f_tree *</I> <B>from</B>)
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>struct f_tree *</I> <B>from</B><DD><P>degenerated tree (linked by <B>tree</B>-&gt;left) to be transformed into form suitable for <B>find_tree()</B>
+</DL>
+<H3>Description</H3>
+<P>Transforms degenerated tree into balanced tree.
+
+
+<HR><H3>Function</H3>
+<P><I>int</I>
+<B>same_tree</B>
+(<I>const struct f_tree *</I> <B>t1</B>, <I>const struct f_tree *</I> <B>t2</B>)
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>const struct f_tree *</I> <B>t1</B><DD><P>first tree to be compared
+<DT><I>const struct f_tree *</I> <B>t2</B><DD><P>second one
+</DL>
+<H3>Description</H3>
+<P>Compares two trees and returns 1 if they are same
+
+<H2><A NAME="ss4.2">4.2</A> <A HREF="prog.html#toc4.2">Trie for prefix sets</A>
+</H2>
+
+<P>
+<P>We use a (compressed) trie to represent prefix sets. Every node
+in the trie represents one prefix (<I>addr</I>/<I>plen</I>) and <I>plen</I> also
+indicates the index of the bit in the address that is used to
+branch at the node. If we need to represent just a set of
+prefixes, it would be simple, but we have to represent a
+set of prefix patterns. Each prefix pattern consists of
+<I>ppaddr</I>/<I>pplen</I> and two integers: <I>low</I> and <I>high</I>, and a prefix
+<I>paddr</I>/<I>plen</I> matches that pattern if the first MIN(<I>plen</I>, <I>pplen</I>)
+bits of <I>paddr</I> and <I>ppaddr</I> are the same and <I>low</I> &lt;= <I>plen</I> &lt;= <I>high</I>.
+<P>We use a bitmask (<I>accept</I>) to represent accepted prefix lengths
+at a node. As there are 33 prefix lengths (0..32 for IPv4), but
+there is just one prefix of zero length in the whole trie so we
+have <I>zero</I> flag in <I>f_trie</I> (indicating whether the trie accepts
+prefix 0.0.0.0/0) as a special case, and <I>accept</I> bitmask
+represents accepted prefix lengths from 1 to 32.
+<P>There are two cases in prefix matching - a match when the length
+of the prefix is smaller that the length of the prefix pattern,
+(<I>plen</I> &lt; <I>pplen</I>) and otherwise. The second case is simple - we
+just walk through the trie and look at every visited node
+whether that prefix accepts our prefix length (<I>plen</I>). The
+first case is tricky - we don't want to examine every descendant
+of a final node, so (when we create the trie) we have to propagate
+that information from nodes to their ascendants.
+<P>Suppose that we have two masks (M1 and M2) for a node. Mask M1
+represents accepted prefix lengths by just the node and mask M2
+represents accepted prefix lengths by the node or any of its
+descendants. Therefore M2 is a bitwise or of M1 and children's
+M2 and this is a maintained invariant during trie building.
+Basically, when we want to match a prefix, we walk through the trie,
+check mask M1 for our prefix length and when we came to
+final node, we check mask M2.
+<P>There are two differences in the real implementation. First,
+we use a compressed trie so there is a case that we skip our
+final node (if it is not in the trie) and we came to node that
+is either extension of our prefix, or completely out of path
+In the first case, we also have to check M2.
+<P>Second, we really need not to maintain two separate bitmasks.
+Checks for mask M1 are always larger than <I>applen</I> and we need
+just the first <I>pplen</I> bits of mask M2 (if trie compression
+hadn't been used it would suffice to know just $applen-th bit),
+so we have to store them together in <I>accept</I> mask - the first
+<I>pplen</I> bits of mask M2 and then mask M1.
+<P>There are four cases when we walk through a trie:
+<P>- we are in NULL
+- we are out of path (prefixes are inconsistent)
+- we are in the wanted (final) node (node length == <I>plen</I>)
+- we are beyond the end of path (node length &gt; <I>plen</I>)
+- we are still on path and keep walking (node length &lt; <I>plen</I>)
+<P>The walking code in <B>trie_match_prefix()</B> is structured according to
+these cases.
+<P>
+<P><HR><H3>Function</H3>
+<P><I>struct f_trie *</I>
+<B>f_new_trie</B>
+(<I>linpool *</I> <B>lp</B>, <I>uint</I> <B>node_size</B>) --     allocates and returns a new empty trie
+<P>
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>linpool *</I> <B>lp</B><DD><P>linear pool to allocate items from
+<DT><I>uint</I> <B>node_size</B><DD><P>node size to be used (<I>f_trie_node</I> and user data)
+</DL>
+
+
+<HR><H3>Function</H3>
+<P><I>void *</I>
+<B>trie_add_prefix</B>
+(<I>struct f_trie *</I> <B>t</B>, <I>const net_addr *</I> <B>net</B>, <I>uint</I> <B>l</B>, <I>uint</I> <B>h</B>)
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>struct f_trie *</I> <B>t</B><DD><P>trie to add to
+<DT><I>const net_addr *</I> <B>net</B><DD><P>IP network prefix
+<DT><I>uint</I> <B>l</B><DD><P>prefix lower bound
+<DT><I>uint</I> <B>h</B><DD><P>prefix upper bound
+</DL>
+<H3>Description</H3>
+<P>Adds prefix (prefix pattern) <B>n</B> to trie <B>t</B>.  <B>l</B> and <B>h</B> are lower
+and upper bounds on accepted prefix lengths, both inclusive.
+0 &lt;= l, h &lt;= 32 (128 for IPv6).
+<P>Returns a pointer to the allocated node. The function can return a pointer to
+an existing node if <B>px</B> and <B>plen</B> are the same. If px/plen == 0/0 (or ::/0),
+a pointer to the root node is returned.
+
+
+<HR><H3>Function</H3>
+<P><I>int</I>
+<B>trie_match_net</B>
+(<I>const struct f_trie *</I> <B>t</B>, <I>const net_addr *</I> <B>n</B>)
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>const struct f_trie *</I> <B>t</B><DD><P>trie
+<DT><I>const net_addr *</I> <B>n</B><DD><P>net address
+</DL>
+<H3>Description</H3>
+<P>Tries to find a matching net in the trie such that
+prefix <B>n</B> matches that prefix pattern. Returns 1 if there
+is such prefix pattern in the trie.
+
+
+<HR><H3>Function</H3>
+<P><I>int</I>
+<B>trie_same</B>
+(<I>const struct f_trie *</I> <B>t1</B>, <I>const struct f_trie *</I> <B>t2</B>)
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>const struct f_trie *</I> <B>t1</B><DD><P>first trie to be compared
+<DT><I>const struct f_trie *</I> <B>t2</B><DD><P>second one
+</DL>
+<H3>Description</H3>
+<P>Compares two tries and returns 1 if they are same
+
+
+<HR><H3>Function</H3>
+<P><I>void</I>
+<B>trie_format</B>
+(<I>const struct f_trie *</I> <B>t</B>, <I>buffer *</I> <B>buf</B>)
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>const struct f_trie *</I> <B>t</B><DD><P>trie to be formatted
+<DT><I>buffer *</I> <B>buf</B><DD><P>destination buffer
+</DL>
+<H3>Description</H3>
+<P>Prints the trie to the supplied buffer.
+
+<HR>
+<A HREF="prog-5.html">Next</A>
+<A HREF="prog-3.html">Previous</A>
+<A HREF="prog.html#toc4">Contents</A>
+</BODY>
+</HTML>
