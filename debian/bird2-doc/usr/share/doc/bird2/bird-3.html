@@ -105,8 +105,16 @@ to the debug output if debugging is enabled by <CODE>-d</CODE>/<CODE>-D</CODE>
 command-line option.
 <P>
 <DT><CODE>
-<A NAME="opt-debug-protocols"></A> debug protocols all|off|{ states|routes|filters|interfaces|events|packets [, <I>...</I>] }</CODE><DD><P>Set global defaults of protocol debugging options. See <CODE>debug</CODE> in the
-following section. Default: off.
+<A NAME="opt-debug-protocols"></A> debug protocols all|off|{ states|routes|filters|interfaces|events|packets [, <I>...</I>] }</CODE><DD><P>Set global defaults of protocol debugging options.
+See 
+<A HREF="#proto-debug">debug</A> in the following section.
+Default: off.
+<P>
+<DT><CODE>
+<A NAME="opt-debug-channels"></A> debug channels all|off|{ states|routes|filters|events [, <I>...</I>] }</CODE><DD><P>Set global defaults of channel debugging options.
+See 
+<A HREF="#channel-debug">debug</A> in the channel section.
+Default: off.
 <P>
 <DT><CODE>
 <A NAME="opt-debug-commands"></A> debug commands <I>number</I></CODE><DD><P>Control logging of client connections (0 for no logging, 1 for logging
@@ -188,6 +196,9 @@ See
 description of interface patterns with extended clauses.
 <P>
 <DT><CODE>
+<A NAME="opt-hostname"></A> hostname "<I>name</I>"</CODE><DD><P>Set hostname. Default: node name as returned by `uname -n'.
+<P>
+<DT><CODE>
 <A NAME="opt-graceful-restart"></A> graceful restart wait <I>number</I></CODE><DD><P>During graceful restart recovery, BIRD waits for convergence of routing
 protocols. This option allows to specify a timeout for the recovery to
 prevent waiting indefinitely if some protocols cannot converge. Default:
@@ -254,12 +265,14 @@ Disabled protocols are not activated. Default: protocol is enabled.
 <A NAME="proto-debug"></A> debug all|off|{ states|routes|filters|interfaces|events|packets [, <I>...</I>] }</CODE><DD><P>Set protocol debugging options. If asked, each protocol is capable of
 writing trace messages about its work to the log (with category
 <CODE>trace</CODE>). You can either request printing of <CODE>all</CODE> trace messages
-or only of the types selected: <CODE>states</CODE> for protocol state changes
+or only of the selected types: <CODE>states</CODE> for protocol state changes
 (protocol going up, down, starting, stopping etc.), <CODE>routes</CODE> for
 routes exchanged with the routing table, <CODE>filters</CODE> for details on
-route filtering, <CODE>interfaces</CODE> for interface change events sent to the
-protocol, <CODE>events</CODE> for events internal to the protocol and <CODE>packets</CODE>
-for packets sent and received by the protocol. Default: off.
+route filtering, <CODE>interfaces</CODE> for interface change events sent to
+the protocol, <CODE>events</CODE> for events internal to the protocol and
+<CODE>packets</CODE> for packets sent and received by the protocol. Classes
+<CODE>routes</CODE> and <CODE>filters</CODE> can be also set per-channel using
+<A HREF="#channel-debug">channel debugging option</A>) Default: off.
 <P>
 <DT><CODE>
 <A NAME="proto-mrtdump"></A> mrtdump all|off|{ states|messages [, <I>...</I>] }</CODE><DD><P>Set protocol MRTdump flags. MRTdump is a standard binary format for
@@ -370,11 +383,12 @@ Default: none.
 <P>
 <DL>
 <DT><CODE>
-<A NAME="proto-pass-id"></A> id <I>num</I></CODE><DD><P>ID of the password, (1-255). If it is not used, BIRD will choose ID based
-on an order of the password item in the interface. For example, second
-password item in one interface will have default ID 2. ID is used by
-some routing protocols to identify which password was used to
-authenticate protocol packets.
+<A NAME="proto-pass-id"></A> id <I>num</I></CODE><DD><P>ID of the password, (0-255). If it is not specified, BIRD will choose ID
+based on an order of the password item in the interface, starting from
+1. For example, second password item in one interface will have default
+ID 2. ID 0 is allowed by BIRD, but some other implementations may not
+allow it. ID is used by some routing protocols to identify which
+password was used to authenticate protocol packets.
 <P>
 <DT><CODE>
 <A NAME="proto-pass-gen-from"></A> generate from "<I>time</I>"</CODE><DD><P>The start time of the usage of the password for packet signing.
@@ -415,6 +429,16 @@ inherited from templates can be updated by new definitions.
 <P>
 <DL>
 <DT><CODE>
+<A NAME="channel-debug"></A> debug all|off|{ states|routes|filters [, <I>...</I>] }</CODE><DD><P>Set channel debugging options. Like in 
+<A HREF="#proto-debug">protocol debugging</A>, channels are capable of writing trace
+messages about its work to the log (with category <CODE>trace</CODE>). You can
+either request printing of <CODE>all</CODE> trace messages or only of the
+selected types: <CODE>states</CODE> for channel state changes (channel going up,
+down, feeding, reloading etc.), <CODE>routes</CODE> for routes propagated
+through the channel, <CODE>filters</CODE> for details on route filtering,
+remaining debug flags are not used in channel debug. Default: off.
+<P>
+<DT><CODE>
 <A NAME="proto-table"></A> table <I>name</I></CODE><DD><P>Specify a table to which the channel is connected. Default: the first
 table of given nettype.
 <P>
@@ -439,6 +463,19 @@ When this option is active, these routes are kept in the routing table,
 but they are hidden and not propagated to other protocols. But it is
 possible to show them using <CODE>show route filtered</CODE>. Note that this
 option does not work for the pipe protocol. Default: off.
+<P>
+<DT><CODE>
+<A NAME="proto-rpki-reload"></A> rpki reload <I>switch</I></CODE><DD><P>Import or export filters may depend on route RPKI status (using
+<CODE>roa_check()</CODE> operator). In contrast to to other filter operators,
+this status for the same route may change as the content of ROA tables
+changes. When this option is active, BIRD activates automatic reload of
+affected channels whenever ROA tables are updated (after a short settle
+time). When disabled, route reloads have to be requested manually. The
+option is ignored if <CODE>roa_check()</CODE> is not used in channel filters.
+Note that for BGP channels, automatic reload requires
+<A HREF="bird-6.html#bgp-import-table">import table</A> or
+<A HREF="bird-6.html#bgp-export-table">export table</A> (for respective
+direction). Default: on.
 <P>
 <DT><CODE>
 <A NAME="proto-import-limit"></A> import limit [<I>number</I> | off ] [action warn | block | restart | disable]</CODE><DD><P>Specify an import route limit (a maximum number of routes imported from

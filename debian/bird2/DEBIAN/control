@@ -1,8 +1,8 @@
 Package: bird2
-Version: 2.0.7-3~buster+xtremenitro
-Architecture: amd64
+Version: 2.0.8-1~buster+xtremenitro
+Architecture: arm64
 Maintainer: Ondřej Surý <ondrej@debian.org>
-Installed-Size: 1313
+Installed-Size: 1342
 Pre-Depends: init-system-helpers (>= 1.56~)
 Depends: adduser, lsb-base, ucf, libc6 (>= 2.27), libreadline7 (>= 6.0), libssh-gcrypt-4 (>= 0.8.0), libtinfo6 (>= 6)
 Suggests: bird2-doc

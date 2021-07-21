@@ -1,4 +1,4 @@
-bird2-dbgsym_2.0.7-3~buster+xtremenitro_amd64.deb debug optional automatic=yes
-bird2-doc_2.0.7-3~buster+xtremenitro_all.deb doc optional
-bird2_2.0.7-3~buster+xtremenitro_amd64.buildinfo net optional
-bird2_2.0.7-3~buster+xtremenitro_amd64.deb net optional
+bird2-dbgsym_2.0.8-1~buster+xtremenitro_arm64.deb debug optional automatic=yes
+bird2-doc_2.0.8-1~buster+xtremenitro_all.deb doc optional
+bird2_2.0.8-1~buster+xtremenitro_arm64.buildinfo net optional
+bird2_2.0.8-1~buster+xtremenitro_arm64.deb net optional

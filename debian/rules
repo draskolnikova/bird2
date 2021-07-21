@@ -12,8 +12,7 @@ include /usr/share/dpkg/default.mk
 COMMON_FLAGS= --prefix=/usr --sysconfdir=/etc/bird --mandir=\$${prefix}/share/man \
 	--infodir=\$${prefix}/share/info --localstatedir=/var --runstatedir=/run/bird \
 	--docdir=\$${prefix}/share/bird2 \
-	--enable-libssh \
-        --enable-client
+	--enable-client
 
 CFLAGS += -g -O2 -fno-strict-aliasing -fno-strict-overflow -fPIC
 LDFLAGS += -g -O2 -fno-strict-aliasing -fno-strict-overflow -fPIC -Wl,-z,defs -Wl,--as-needed

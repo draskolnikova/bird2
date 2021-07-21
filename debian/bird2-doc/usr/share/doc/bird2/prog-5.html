@@ -268,13 +268,13 @@ main thread.
 related to the session and two timers (TX timer for periodic packets and hold
 timer for session timeout). These sessions are allocated from <B>session_slab</B>
 and are accessible by two hash tables, <B>session_hash_id</B> (by session ID) and
-<B>session_hash_ip</B> (by IP addresses of neighbors). Slab and both hashes are in
-the main protocol structure <I>bfd_proto</I>. The protocol logic related to BFD
-sessions is implemented in internal functions bfd_session_*(), which are
-expected to be called from the context of BFD thread, and external functions
-<B>bfd_add_session()</B>, <B>bfd_remove_session()</B> and <B>bfd_reconfigure_session()</B>, which
-form an interface to the BFD core for the rest and are expected to be called
-from the context of main thread.
+<B>session_hash_ip</B> (by IP addresses of neighbors and associated interfaces).
+Slab and both hashes are in the main protocol structure <I>bfd_proto</I>. The
+protocol logic related to BFD sessions is implemented in internal functions
+bfd_session_*(), which are expected to be called from the context of BFD
+thread, and external functions <B>bfd_add_session()</B>, <B>bfd_remove_session()</B> and
+<B>bfd_reconfigure_session()</B>, which form an interface to the BFD core for the
+rest and are expected to be called from the context of main thread.
 <P>Each BFD session has an associated BFD interface, represented by structure
 <I>bfd_iface</I>. A BFD interface contains a socket used for TX (the one for RX is
 shared in <I>bfd_proto</I>), an interface configuration and reference counter.
@@ -419,9 +419,10 @@ RFC 7947 - Internet Exchange BGP Route Server
 RFC 8092 - BGP Large Communities Attribute
 RFC 8203 - BGP Administrative Shutdown Communication
 RFC 8212 - Default EBGP Route Propagation Behavior without Policies
-draft-ietf-idr-bgp-extended-messages-27
+RFC 8654 - Extended Message Support for BGP
 draft-ietf-idr-ext-opt-param-07
 draft-uttaro-idr-bgp-persistence-04
+draft-walton-bgp-hostname-capability-02
 <P>
 <P><HR><H3>Function</H3>
 <P><I>int</I>
@@ -1394,10 +1395,11 @@ has some associated routes, it is not freed, just changed to detached state
 cleanup phase the associated routes are removed and the <I>rip_neighbor</I>
 structure is finally freed.
 <P>Supported standards:
-- RFC 1058 - RIPv1
-- RFC 2453 - RIPv2
-- RFC 2080 - RIPng
-- RFC 4822 - RIP cryptographic authentication
+RFC 1058 - RIPv1
+RFC 2453 - RIPv2
+RFC 2080 - RIPng
+RFC 2091 - Triggered RIP for demand circuits
+RFC 4822 - RIP cryptographic authentication
 <P>
 <P><HR><H3>Function</H3>
 <P><I>void</I>
@@ -1518,6 +1520,21 @@ call or may continue in <B>rip_tx_hook()</B> until all appropriate routes are
 transmitted. Note that there may be at most one active update session per
 interface, the function will terminate the old active session before
 activating the new one.
+
+
+<HR><H3>Function</H3>
+<P><I>void</I>
+<B>rip_rxmt_timeout</B>
+(<I>timer *</I> <B>t</B>) --  RIP retransmission timer hook
+<P>
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>timer *</I> <B>t</B><DD><P>timer
+</DL>
+<H3>Description</H3>
+<P>In Demand Circuit mode, update packets must be acknowledged to ensure
+reliability. If they are not acknowledged, we need to retransmit them.
 
 <H2><A NAME="ss5.8">5.8</A> <A HREF="prog.html#toc5.8">RPKI To Router (RPKI-RTR)</A>
 </H2>
@@ -1886,12 +1903,13 @@ write them into net_addr_roa4 or net_addr_roa6 data structure.
 <HR><H3>Function</H3>
 <P><I>ip_addr</I>
 <B>rpki_hostname_autoresolv</B>
-(<I>const char *</I> <B>host</B>) --  auto-resolve an IP address from a hostname
+(<I>const char *</I> <B>host</B>, <I>const char **</I> <B>err_msg</B>) --  auto-resolve an IP address from a hostname
 <P>
 <H3>Arguments</H3>
 <P>
 <DL>
 <DT><I>const char *</I> <B>host</B><DD><P>domain name of host, e.g. "rpki-validator.realmv6.org"
+<DT><I>const char **</I> <B>err_msg</B><DD><P>error message returned in case of errors
 </DL>
 <H3>Description</H3>
 <P>This function resolves an IP address from a hostname.

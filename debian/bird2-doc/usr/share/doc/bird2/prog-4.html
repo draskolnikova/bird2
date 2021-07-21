@@ -215,13 +215,13 @@ these cases.
 <P><HR><H3>Function</H3>
 <P><I>struct f_trie *</I>
 <B>f_new_trie</B>
-(<I>linpool *</I> <B>lp</B>, <I>uint</I> <B>node_size</B>) --     allocates and returns a new empty trie
+(<I>linpool *</I> <B>lp</B>, <I>uint</I> <B>data_size</B>) --     allocates and returns a new empty trie
 <P>
 <H3>Arguments</H3>
 <P>
 <DL>
 <DT><I>linpool *</I> <B>lp</B><DD><P>linear pool to allocate items from
-<DT><I>uint</I> <B>node_size</B><DD><P>node size to be used (<I>f_trie_node</I> and user data)
+<DT><I>uint</I> <B>data_size</B><DD><P>user data attached to node
 </DL>
 
 
@@ -243,7 +243,8 @@ and upper bounds on accepted prefix lengths, both inclusive.
 0 &lt;= l, h &lt;= 32 (128 for IPv6).
 <P>Returns a pointer to the allocated node. The function can return a pointer to
 an existing node if <B>px</B> and <B>plen</B> are the same. If px/plen == 0/0 (or ::/0),
-a pointer to the root node is returned.
+a pointer to the root node is returned. Returns NULL when called with
+mismatched IPv4/IPv6 net type.
 
 
 <HR><H3>Function</H3>

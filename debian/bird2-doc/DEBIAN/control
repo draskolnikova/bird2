@@ -1,9 +1,9 @@
 Package: bird2-doc
 Source: bird2
-Version: 2.0.7-3~buster+xtremenitro
+Version: 2.0.8-1~buster+xtremenitro
 Architecture: all
 Maintainer: Ondřej Surý <ondrej@debian.org>
-Installed-Size: 1688
+Installed-Size: 1728
 Section: doc
 Priority: optional
 Homepage: https://bird.network.cz/

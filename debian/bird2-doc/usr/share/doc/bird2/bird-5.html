@@ -148,7 +148,7 @@ a shell pattern (represented also as a string).
 <DT><CODE>
 <A NAME="type-ip"></A> ip</CODE><DD><P>This type can hold a single IP address. The IPv4 addresses are stored as
 IPv4-Mapped IPv6 addresses so one data type for both of them is used.
-Whether the address is IPv4 or not may be checked by <CODE>.is_ip4</CODE>
+Whether the address is IPv4 or not may be checked by <CODE>.is_v4</CODE>
 which returns a <CODE>bool</CODE>. IP addresses are written in the standard
 notation (<CODE>10.20.30.40</CODE> or <CODE>fec0:3:4::1</CODE>). You can apply special
 operator <CODE>.mask(<I>num</I>)</CODE> on values of type ip. It masks out
@@ -169,7 +169,9 @@ So <CODE>1.2.0.0/16.len = 16</CODE> is true.
 prefix. The literals are written as <CODE><I>ipaddress</I>/<I>pxlen</I> from
 <I>ipaddress</I>/<I>pxlen</I></CODE>, where the first part is the destination
 prefix and the second art is the source prefix. They support the same
-operators as IP prefixes, but just for the destination part.
+operators as IP prefixes, but just for the destination part. They also
+support <CODE>.src</CODE> and <CODE>.dst</CODE> operators to get respective parts of the
+address as separate <CODE>NET_IP6</CODE> values.
 <P><CODE>NET_VPN4</CODE> and <CODE>NET_VPN6</CODE> prefixes hold an IP prefix with VPN
 Route Distinguisher (<A HREF="http://www.rfc-editor.org/info/rfc4364">RFC 4364</A>). They support the same special
 operators as IP prefixes, and also <CODE>.rd</CODE> which extracts the Route
@@ -180,7 +182,9 @@ together with an ASN. They support the same special operators as IP
 prefixes, and also <CODE>.maxlen</CODE> which extracts maximal prefix length,
 and <CODE>.asn</CODE> which extracts the ASN.
 <P><CODE>NET_FLOW4</CODE> and <CODE>NET_FLOW6</CODE> hold an IP prefix together with a
-flowspec rule. Filters currently don't support flowspec parsing.
+flowspec rule. Filters currently do not support much flowspec parsing,
+only <CODE>.src</CODE> and <CODE>.dst</CODE> operators to get source and destination
+parts of the flowspec as separate <CODE>NET_IP4</CODE> / <CODE>NET_IP6</CODE> values.
 <P><CODE>NET_MPLS</CODE> holds a single MPLS label and its handling is currently
 not implemented.
 <P>
@@ -279,9 +283,10 @@ is true, but <CODE>1.0.0.0/16 ~ [ 1.0.0.0/8- ]</CODE> is false.
 in BIRD as <CODE>10.0.0.0/8{16,24}</CODE>, <CODE>192.168.0.0/16 le 24</CODE> as
 <CODE>192.168.0.0/16{16,24}</CODE> and <CODE>192.168.0.0/16 ge 24</CODE> as
 <CODE>192.168.0.0/16{24,32}</CODE>.
-<P>It is possible to mix IPv4 and IPv6 prefixes/addresses in a prefix/ip set
-but its behavior may change between versions without any warning; don't do
-it unless you are more than sure what you are doing. (Really, don't do it.)
+<P>It is not possible to mix IPv4 and IPv6 prefixes in a prefix set. It is
+currently possible to mix IPv4 and IPv6 addresses in an ip set, but that
+behavior may change between versions without any warning; don't do it
+unless you are more than sure what you are doing. (Really, don't do it.)
 <P>
 <DT><CODE>
 <A NAME="type-enum"></A> enum</CODE><DD><P>Enumeration types are fixed sets of possibilities. You can't define your
@@ -320,11 +325,15 @@ as used by UNIX shells. Autonomous system numbers match themselves,
 <CODE>*</CODE> matches any (even empty) sequence of arbitrary AS numbers and
 <CODE>?</CODE> matches one arbitrary AS number. For example, if <CODE>bgp_path</CODE>
 is 4 3 2 1, then: <CODE>bgp_path ~ [= * 4 3 * =]</CODE> is true,
-but <CODE>bgp_path ~ [= * 4 5 * =]</CODE> is false. BGP mask
-expressions can also contain integer expressions enclosed in parenthesis
-and integer variables, for example <CODE>[= * 4 (1+2) a =]</CODE>. You can
-also use ranges (e.g. <CODE>[= * 3..5 2 100..200 * =]</CODE>) and sets
-(e.g. <CODE>[= 1 2 [3, 5, 7] * =]</CODE>).
+but <CODE>bgp_path ~ [= * 4 5 * =]</CODE> is false. There is also
+<CODE>+</CODE> operator which matches one or multiple instances of previous
+expression, e.g. <CODE>[= 1 2+ 3 =]</CODE> matches both path 1 2 3 and path
+1 2 2 2 3, but not 1 3 nor 1 2 4 3. Note that while <CODE>*</CODE> and <CODE>?</CODE>
+are wildcard-style operators, <CODE>+</CODE> is regex-style operator.
+<P>BGP mask expressions can also contain integer expressions enclosed in
+parenthesis and integer variables, for example <CODE>[= * 4 (1+2) a =]</CODE>.
+You can also use ranges (e.g. <CODE>[= * 3..5 2 100..200 * =]</CODE>)
+and sets (e.g. <CODE>[= 1 2 [3, 5, 7] * =]</CODE>).
 <P>
 <DT><CODE>
 <A NAME="type-clist"></A> clist</CODE><DD><P>Clist is similar to a set, except that unlike other sets, it can be
@@ -485,9 +494,8 @@ Read-only.
 <DT><CODE>
 <A NAME="rta-source"></A> <I>enum</I> source</CODE><DD><P>what protocol has told me about this route. Possible values:
 <CODE>RTS_DUMMY</CODE>, <CODE>RTS_STATIC</CODE>, <CODE>RTS_INHERIT</CODE>, <CODE>RTS_DEVICE</CODE>,
-<CODE>RTS_STATIC_DEVICE</CODE>, <CODE>RTS_REDIRECT</CODE>, <CODE>RTS_RIP</CODE>, <CODE>RTS_OSPF</CODE>,
-<CODE>RTS_OSPF_IA</CODE>, <CODE>RTS_OSPF_EXT1</CODE>, <CODE>RTS_OSPF_EXT2</CODE>, <CODE>RTS_BGP</CODE>,
-<CODE>RTS_PIPE</CODE>, <CODE>RTS_BABEL</CODE>.
+<CODE>RTS_RIP</CODE>, <CODE>RTS_OSPF</CODE>, <CODE>RTS_OSPF_IA</CODE>, <CODE>RTS_OSPF_EXT1</CODE>,
+<CODE>RTS_OSPF_EXT2</CODE>, <CODE>RTS_BGP</CODE>, <CODE>RTS_PIPE</CODE>, <CODE>RTS_BABEL</CODE>.
 <P>
 <DT><CODE>
 <A NAME="rta-dest"></A> <I>enum</I> dest</CODE><DD><P>Type of destination the packets should be sent to
@@ -511,6 +519,16 @@ would also change route to a direct one (remove gateway).
 be used for interface matching, however indexes might change on interface
 creation/removal. Zero is returned for routes with undefined outgoing
 interfaces. Read-only.
+<P>
+<DT><CODE>
+<A NAME="rta-weight"></A> <I>int</I> weight</CODE><DD><P>Multipath weight of route next hops. Valid values are 1-256. Reading
+returns the weight of the first next hop, setting it sets weights of all
+next hops to the specified value. Therefore, this attribute is not much
+useful for manipulating individual next hops of an ECMP route, but can
+be used in BGP multipath setup to set weights of individual routes that
+are merged to one ECMP route during export to the Kernel protocol
+(with active 
+<A HREF="bird-6.html#krt-merge-paths">marge paths</A> option).
 <P>
 <DT><CODE>
 <A NAME="rta-igp-metric"></A> <I>int</I> igp_metric</CODE><DD><P>The optional attribute that can be used to specify a distance to the
@@ -542,9 +560,6 @@ at this point.
 <DT><CODE>
 <A NAME="print"></A> print|printn <I>expr</I> [<I>, expr...</I>]</CODE><DD><P>Prints given expressions; useful mainly while debugging filters. The
 <CODE>printn</CODE> variant does not terminate the line.
-<P>
-<DT><CODE>
-<A NAME="quitbird"></A> quitbird</CODE><DD><P>Terminates BIRD. Useful when debugging the filter interpreter.
 </DL>
 <P>
 <P>

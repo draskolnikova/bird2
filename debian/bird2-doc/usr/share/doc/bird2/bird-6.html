@@ -246,6 +246,8 @@ configuration is often sufficient.
 <P>
 <P>Note that to use BFD for other protocols like OSPF or BGP, these protocols
 also have to be configured to request BFD sessions, usually by <CODE>bfd</CODE> option.
+In BGP case, it is also possible to specify per-peer BFD session options (e.g.
+rx/tx intervals) as a part of the <CODE>bfd</CODE> option.
 <P>
 <P>A BFD instance not associated with any VRF handles session requests from all
 other protocols, even ones associated with a VRF. Such setup would work for
@@ -263,6 +265,7 @@ milliseconds.
 <HR>
 <PRE>
 protocol bfd [&lt;name&gt;] {
+        accept [ipv4|ipv6] [direct|multihop];
         interface &lt;interface pattern&gt; {
                 interval &lt;time&gt;;
                 min rx interval &lt;time&gt;;
@@ -298,6 +301,14 @@ protocol bfd [&lt;name&gt;] {
 <HR>
 <P>
 <DL>
+<DT><CODE>
+<A NAME="bfd-accept"></A> accept [ipv4|ipv6] [direct|multihop]</CODE><DD><P>A BFD protocol instance accepts (by default) all BFD session requests
+(with regard to VRF restrictions, see above). This option controls
+whether IPv4 / IPv6 and direct / multihop session requests are accepted
+(and which listening sockets are opened). It can be used, for example,
+to configure separate BFD protocol instances for IPv4 and for IPv6
+sessions.
+<P>
 <DT><CODE>
 <A NAME="bfd-iface"></A> interface <I>pattern</I> [, <I>...</I>] { <I>options</I> }</CODE><DD><P>Interface definitions allow to specify options for sessions associated
 with such interfaces and also may contain interface specific options.
@@ -604,13 +615,16 @@ immediately shut down. Note that this option cannot be used with
 multihop BGP. Default: enabled for direct BGP, disabled otherwise.
 <P>
 <DT><CODE>
-<A NAME="bgp-bfd"></A> bfd <I>switch</I>|graceful</CODE><DD><P>BGP could use BFD protocol as an advisory mechanism for neighbor
+<A NAME="bgp-bfd"></A> bfd <I>switch</I>|graceful| { <I>options</I> }</CODE><DD><P>BGP could use BFD protocol as an advisory mechanism for neighbor
 liveness and failure detection. If enabled, BIRD setups a BFD session
 for the BGP neighbor and tracks its liveness by it. This has an
 advantage of an order of magnitude lower detection times in case of
 failure. When a neighbor failure is detected, the BGP session is
 restarted. Optionally, it can be configured (by <CODE>graceful</CODE> argument)
-to trigger graceful restart instead of regular restart. Note that BFD
+to trigger graceful restart instead of regular restart. It is also
+possible to specify section with per-peer BFD session options instead of
+just switch argument. Most BFD session specific options are allowed here
+with the exception of authentication options. here Note that BFD
 protocol also has to be configured, see 
 <A HREF="#bfd">BFD</A>
 section for details. Default: disabled.
@@ -702,6 +716,25 @@ completely disabled and you should ensure loop-free behavior by some
 other means. Default: 0 (no local AS number allowed).
 <P>
 <DT><CODE>
+<A NAME="bgp-allow-as-sets"></A> allow as sets [<I>switch</I>]</CODE><DD><P>AS path attribute received with BGP routes may contain not only
+sequences of AS numbers, but also sets of AS numbers. These rarely used
+artifacts are results of inter-AS route aggregation. AS sets are
+deprecated (<A HREF="http://www.rfc-editor.org/info/rfc6472">RFC 6472</A>), and likely to be rejected in the future,
+as they complicate security features like RPKI validation. When this
+option is disabled, then received AS paths with AS sets are rejected as
+malformed and corresponding BGP updates are treated as withdraws.
+Default: on.
+<P>
+<DT><CODE>
+<A NAME="bgp-enforce-first-as"></A> enforce first as [<I>switch</I>]</CODE><DD><P>Routes received from an EBGP neighbor are generally expected to have the
+first (leftmost) AS number in their AS path equal to the neighbor AS
+number. This is not enforced by default as there are legitimate cases
+where it is not true, e.g. connections to route servers. When this
+option is enabled, routes with non-matching first AS number are rejected
+and corresponding updates are treated as withdraws. The option is valid
+on EBGP sessions only. Default: off.
+<P>
+<DT><CODE>
 <A NAME="bgp-enable-route-refresh"></A> enable route refresh <I>switch</I></CODE><DD><P>After the initial route exchange, BGP protocol uses incremental updates
 to keep BGP speakers synchronized. Sometimes (e.g., if BGP speaker
 changes its import filter, or if there is suspicion of inconsistency) it
@@ -775,8 +808,8 @@ in neighbor's implementation of 4B AS extension. Even when disabled
 <P>
 <DT><CODE>
 <A NAME="bgp-enable-extended-messages"></A> enable extended messages <I>switch</I></CODE><DD><P>The BGP protocol uses maximum message length of 4096 bytes. This option
-provides an extension to allow extended messages with length up
-to 65535 bytes. Default: off.
+provides an extension (<A HREF="http://www.rfc-editor.org/info/rfc8654">RFC 8654</A>) to allow extended messages with
+length up to 65535 bytes. Default: off.
 <P>
 <DT><CODE>
 <A NAME="bgp-capabilities"></A> capabilities <I>switch</I></CODE><DD><P>Use capability advertisement to advertise optional capabilities. This is
@@ -792,6 +825,9 @@ according to the strict interpretation of <A HREF="http://www.rfc-editor.org/inf
 widespread and required by some BGP implementations (Cisco and Quagga).
 This option is relevant to IPv4 mode with enabled capability
 advertisement only. Default: on.
+<P>
+<DT><CODE>
+<A NAME="bgp-advertise-hostname"></A> advertise hostname <I>switch</I></CODE><DD><P>Advertise hostname capability along with the hostname. Default: off.
 <P>
 <DT><CODE>
 <A NAME="bgp-disable-after-error"></A> disable after error <I>switch</I></CODE><DD><P>When an error is encountered (either locally or by the other side),
@@ -959,29 +995,14 @@ BGP session (if acceptable), or the preferred address of an associated
 interface.
 <P>
 <DT><CODE>
-<A NAME="bgp-missing-lladdr"></A> missing lladdr self|drop|ignore</CODE><DD><P>Next Hop attribute in BGP-IPv6 sometimes contains just the global IPv6
-address, but sometimes it has to contain both global and link-local IPv6
-addresses. This option specifies what to do if BIRD have to send both
-addresses but does not know link-local address. This situation might
-happen when routes from other protocols are exported to BGP, or when
-improper updates are received from BGP peers. <CODE>self</CODE> means that BIRD
-advertises its own local address instead. <CODE>drop</CODE> means that BIRD
-skips that prefixes and logs error. <CODE>ignore</CODE> means that BIRD ignores
-the problem and sends just the global address (and therefore forms
-improper BGP update). Default: <CODE>self</CODE>, unless BIRD is configured as a
-route server (option <CODE>rs client</CODE>), in that case default is <CODE>ignore</CODE>,
-because route servers usually do not forward packets themselves.
-<P>
-<DT><CODE>
 <A NAME="bgp-gateway"></A> gateway direct|recursive</CODE><DD><P>For received routes, their <CODE>gw</CODE> (immediate next hop) attribute is
 computed from received <CODE>bgp_next_hop</CODE> attribute. This option
 specifies how it is computed. Direct mode means that the IP address from
-<CODE>bgp_next_hop</CODE> is used if it is directly reachable, otherwise the
-neighbor IP address is used. Recursive mode means that the gateway is
-computed by an IGP routing table lookup for the IP address from
-<CODE>bgp_next_hop</CODE>. Note that there is just one level of indirection in
-recursive mode - the route obtained by the lookup must not be recursive
-itself, to prevent mutually recursive routes.
+<CODE>bgp_next_hop</CODE> is used and must be directly reachable. Recursive mode
+means that the gateway is computed by an IGP routing table lookup for
+the IP address from <CODE>bgp_next_hop</CODE>. Note that there is just one level
+of indirection in recursive mode - the route obtained by the lookup must
+not be recursive itself, to prevent mutually recursive routes.
 <P>Recursive mode is the behavior specified by the BGP
 standard. Direct mode is simpler, does not require any routes in a
 routing table, and was used in older versions of BIRD, but does not
@@ -1677,18 +1698,18 @@ protocol ospf [v2|v3] &lt;name&gt; {
                 networks {
                         &lt;prefix&gt;;
                         &lt;prefix&gt; hidden;
-                }
+                };
                 external {
                         &lt;prefix&gt;;
                         &lt;prefix&gt; hidden;
                         &lt;prefix&gt; tag &lt;num&gt;;
-                }
+                };
                 stubnet &lt;prefix&gt;;
                 stubnet &lt;prefix&gt; {
                         hidden &lt;switch&gt;;
                         summary &lt;switch&gt;;
                         cost &lt;num&gt;;
-                }
+                };
                 interface &lt;interface pattern&gt; [instance &lt;num&gt;] {
                         cost &lt;num&gt;;
                         stub &lt;switch&gt;;
@@ -1708,6 +1729,7 @@ protocol ospf [v2|v3] &lt;name&gt; {
                         strict nonbroadcast &lt;switch&gt;;
                         real broadcast &lt;switch&gt;;
                         ptp netmask &lt;switch&gt;;
+                        ptp address &lt;switch&gt;;
                         check link &lt;switch&gt;;
                         bfd &lt;switch&gt;;
                         ecmp weight &lt;num&gt;;
@@ -2043,11 +2065,26 @@ interoperable with other OSPF implementations. Default value is no.
 <A NAME="ospf-ptp-netmask"></A> ptp netmask <I>switch</I></CODE><DD><P>In <CODE>type ptp</CODE> network configurations, OSPFv2 implementations should
 ignore received netmask field in hello packets and should send hello
 packets with zero netmask field on unnumbered PtP links. But some OSPFv2
-implementations perform netmask checking even for PtP links. This option
-specifies whether real netmask will be used in hello packets on <CODE>type
-ptp</CODE> interfaces. You should ignore this option unless you meet some
-compatibility problems related to this issue. Default value is no for
-unnumbered PtP links, yes otherwise.
+implementations perform netmask checking even for PtP links.
+<P>This option specifies whether real netmask will be used in hello packets
+on <CODE>type ptp</CODE> interfaces. You should ignore this option unless you
+meet some compatibility problems related to this issue. Default value is
+no for unnumbered PtP links, yes otherwise.
+<P>
+<DT><CODE>
+<A NAME="ospf-ptp-address"></A> ptp address <I>switch</I></CODE><DD><P>In <CODE>type ptp</CODE> network configurations, OSPFv2 implementations should
+use IP address for regular PtP links and interface id for unnumbered PtP
+links in data field of link description records in router LSA. This data
+field has only local meaning for PtP links, but some broken OSPFv2
+implementations assume there is an IP address and use it as a next hop
+in SPF calculations. Note that interface id for unnumbered PtP links is
+necessary when graceful restart is enabled to distinguish PtP links with
+the same local IP address.
+<P>This option specifies whether an IP address will be used in data field
+for <CODE>type ptp</CODE> interfaces, it is ignored for other interfaces. You
+should ignore this option unless you meet some compatibility problems
+related to this issue. Default value is no for unnumbered PtP links when
+graceful restart is enabled, yes otherwise.
 <P>
 <DT><CODE>
 <A NAME="ospf-check-link"></A> check link <I>switch</I></CODE><DD><P>If set, a hardware link state (reported by OS) is taken into consideration.
@@ -2193,7 +2230,7 @@ protocol ospf MyOSPF {
                 networks {
                         172.16.1.0/24;
                         172.16.2.0/24 hidden;
-                }
+                };
                 interface "-arc0" , "arc*" {
                         type nonbroadcast;
                         authentication none;
@@ -2726,7 +2763,8 @@ counting to infinity is necessary, because it is slow. Due to infinity being 16,
 you can't use RIP on networks where maximal distance is higher than 15
 hosts.
 <P>
-<P>BIRD supports RIPv1 (<A HREF="http://www.rfc-editor.org/info/rfc1058">RFC 1058</A>), RIPv2 (<A HREF="http://www.rfc-editor.org/info/rfc2453">RFC 2453</A>), RIPng (<A HREF="http://www.rfc-editor.org/info/rfc2080">RFC 2080</A>), and RIP cryptographic authentication (<A HREF="http://www.rfc-editor.org/info/rfc4822">RFC 4822</A>).
+<P>BIRD supports RIPv1 (<A HREF="http://www.rfc-editor.org/info/rfc1058">RFC 1058</A>), RIPv2 (<A HREF="http://www.rfc-editor.org/info/rfc2453">RFC 2453</A>), RIPng (<A HREF="http://www.rfc-editor.org/info/rfc2080">RFC 2080</A>), Triggered RIP for demand circuits (<A HREF="http://www.rfc-editor.org/info/rfc2091">RFC 2091</A>), and RIP
+cryptographic authentication (<A HREF="http://www.rfc-editor.org/info/rfc4822">RFC 4822</A>).
 <P>
 <P>RIP is a very simple protocol, and it has a lot of shortcomings. Slow
 convergence, big network load and inability to handle larger networks makes it
@@ -2756,6 +2794,7 @@ protocol rip [ng] [&lt;name&gt;] {
                 version 1|2;
                 split horizon &lt;switch&gt;;
                 poison reverse &lt;switch&gt;;
+                demand circuit &lt;switch&gt;;
                 check zero &lt;switch&gt;;
                 update time &lt;number&gt;;
                 timeout time &lt;number&gt;;
@@ -2861,6 +2900,16 @@ independent path to the destination of the route. Default: yes.
 reverse variant (propagating routes back with an infinity metric) is
 used. The poisoned reverse has some advantages in faster convergence,
 but uses more network traffic. Default: yes.
+<P>
+<DT><CODE>
+<A NAME="rip-iface-demand-circuit"></A> demand circuit <I>switch</I></CODE><DD><P>Regular RIP sends periodic full updates on an interface. There is the
+Triggered RIP extension for demand circuits (<A HREF="http://www.rfc-editor.org/info/rfc2091">RFC 2091</A>), which
+removes periodic updates and introduces update acknowledgments. When
+enabled, there is no RIP communication in steady-state network. Note
+that in order to work, it must be enabled on both sides. As there are
+no hello packets, it depends on hardware link state to detect neighbor
+failures. Also, it is designed for PtP links and it does not work
+properly with multiple RIP neighbors on an interface. Default: no.
 <P>
 <DT><CODE>
 <A NAME="rip-iface-check-zero"></A> check zero <I>switch</I></CODE><DD><P>Received RIPv1 packets with non-zero values in reserved fields should
@@ -2991,21 +3040,21 @@ protocol rip {
 <H3>Introduction</H3>
 
 <P>The Resource Public Key Infrastructure (RPKI) is mechanism for origin
-validation of BGP routes (RFC 6480). BIRD supports only so-called RPKI-based
-origin validation. There is implemented RPKI to Router (RPKI-RTR) protocol (RFC
-6810). It uses some of the RPKI data to allow a router to verify that the
-autonomous system announcing an IP address prefix is in fact authorized to do
-so. This is not crypto checked so can be violated. But it should prevent the
-vast majority of accidental hijackings on the Internet today, e.g. the famous
-Pakastani accidental announcement of YouTube's address space.
+validation of BGP routes (<A HREF="http://www.rfc-editor.org/info/rfc6480">RFC 6480</A>). BIRD supports only so-called
+RPKI-based origin validation. There is implemented RPKI to Router (RPKI-RTR)
+protocol (<A HREF="http://www.rfc-editor.org/info/rfc6810">RFC 6810</A>). It uses some of the RPKI data to allow a router to
+verify that the autonomous system announcing an IP address prefix is in fact
+authorized to do so. This is not crypto checked so can be violated. But it
+should prevent the vast majority of accidental hijackings on the Internet today,
+e.g. the famous Pakistani accidental announcement of YouTube's address space.
 <P>
 <P>The RPKI-RTR protocol receives and maintains a set of ROAs from a cache
-server (also called validator). You can validate routes (RFC 6483) using
-function <CODE>roa_check()</CODE> in filter and set it as import filter at the BGP
-protocol. BIRD should re-validate all of affected routes after RPKI update by
-RFC 6811, but we don't support it yet! You can use a BIRD's client command
-<CODE>reload in <I>bgp_protocol_name</I></CODE> for manual call of revalidation of all
-routes.
+server (also called validator). You can validate routes (<A HREF="http://www.rfc-editor.org/info/rfc6483">RFC 6483</A>,
+<A HREF="http://www.rfc-editor.org/info/rfc6811">RFC 6811</A>) using function <CODE>roa_check()</CODE> in filter and set it as import
+filter at the BGP protocol. BIRD offers crude automatic re-validating of
+affected routes after RPKI update, see option 
+<A HREF="bird-3.html#proto-rpki-reload">rpki reload</A>. Or you can use a BIRD client command <CODE>reload in
+<I>bgp_protocol_name</I></CODE> for manual call of revalidation of all routes.
 <P>
 <H3>Supported transports</H3>
 
@@ -3082,6 +3131,10 @@ data for this time period.  Must be in range from 600 seconds (ten
 minutes) to 172800 seconds (two days).  A keyword <CODE>keep</CODE>
 suppresses updating this value by a cache server.
 Default: 7200 seconds
+<P>
+<DT><CODE>ignore max length <I>switch</I></CODE><DD><P>Ignore received max length in ROA records and use max value (32 or 128)
+instead. This may be useful for implementing loose RPKI check for
+blackholes. Default: disabled.
 <P>
 <DT><CODE>transport tcp</CODE><DD><P>Unprotected transport over TCP. It's a default
 transport. Should be used only on secure private networks.
@@ -3190,8 +3243,16 @@ default route to prevent routing loops).
 <P>
 <P>There are three classes of definitions in Static protocol configuration --
 global options, static route definitions, and per-route options. Usually, the
-definition of the protocol contains mainly a list of static routes.
-Static routes have no specific attributes.
+definition of the protocol contains mainly a list of static routes. Static
+routes have no specific attributes, but 
+<A HREF="bird-5.html#rta-igp-metric">igp_metric</A>
+attribute is used to compare static routes with the same preference.
+<P>
+<P>The list of static routes may contain multiple routes for the same network
+(usually, but not necessary, distinquished by <CODE>preference</CODE> or <CODE>igp_metric</CODE>),
+but only routes of the same network type are allowed, as the static protocol
+has just one channel. E.g., to have both IPv4 and IPv6 static routes, define two
+static protocols, each with appropriate routes and channel.
 <P>
 <P>Global options:
 <P>
@@ -3216,7 +3277,7 @@ routes. Default: the same table as the protocol is connected to.
 <A HREF="bird-5.html#type-prefix">dependent on network type</A>.
 <P>
 <DL>
-<DT><CODE>route <I>prefix</I> via <I>ip</I>|<I>"interface"</I> [mpls <I>num</I>[/<I>num</I>[/<I>num</I>[...]]]]</CODE><DD><P>Next hop routes may bear one or more 
+<DT><CODE>route <I>prefix</I> via <I>ip</I>|<I>"interface"</I> [<I>per-nexthop options</I>] [via ...]</CODE><DD><P>Regular routes may bear one or more 
 <A HREF="bird-2.html#route-next-hop">next hops</A>.
 Every next hop is preceded by <CODE>via</CODE> and configured as shown.
 <P>
@@ -3233,6 +3294,47 @@ targets are also known as <CODE>drop</CODE> and <CODE>reject</CODE>.
 the next hop of the route is not a neighbor at the moment), Static just
 uninstalls the route from the table it is connected to and adds it again as soon
 as the destination becomes adjacent again.
+<P>
+<H3>Per-nexthop options</H3>
+
+<P>There are several options that in a case of multipath route are per-nexthop
+(i.e., they can be used multiple times for a route, one time for each nexthop).
+Syntactically, they are not separate options but just parts of <CODE>route</CODE>
+statement after each <CODE>via</CODE> statement, not separated by semicolons. E.g.,
+statement <CODE>route 10.0.0.0</CODE>8 via 192.0.2.1 bfd weight 1 via 192.0.2.2 weight
+2;/ describes a route with two nexthops, the first nexthop has two per-nexthop
+options (<CODE>bfd</CODE> and <CODE>weight 1</CODE>), the second nexthop has just <CODE>weight 2</CODE>.
+<P>
+<DL>
+<DT><CODE>
+<A NAME="static-route-bfd"></A> bfd <I>switch</I></CODE><DD><P>The Static protocol could use BFD protocol for next hop liveness
+detection. If enabled, a BFD session to the route next hop is created
+and the static route is BFD-controlled -- the static route is announced
+only if the next hop liveness is confirmed by BFD. If the BFD session
+fails, the static route (or just the affected nexthop from multiple
+ones) is removed. Note that this is a bit different compared to other
+protocols, which may use BFD as an advisory mechanism for fast failure
+detection but ignore it if a BFD session is not even established. Note
+that BFD protocol also has to be configured, see 
+<A HREF="#bfd">BFD</A>
+section for details. Default value is no.
+<P>
+<DT><CODE>
+<A NAME="static-route-mpls"></A> mpls <I>num</I>[/<I>num</I>[/<I>num</I>[...]]]</CODE><DD><P>MPLS labels that should be pushed to packets forwarded by the route.
+The option could be used for both IP routes (on MPLS ingress routers)
+and MPLS switching rules (on MPLS transit routers). Default value is
+no labels.
+<P>
+<DT><CODE>
+<A NAME="static-route-onlink"></A> onlink <I>switch</I></CODE><DD><P>Onlink flag means that the specified nexthop is accessible on the
+(specified) interface regardless of IP prefixes of the interface. The
+interface must be attached to nexthop IP address using link-local-scope
+format (e.g. <CODE>192.0.2.1%eth0</CODE>). Default value is no.
+<P>
+<DT><CODE>
+<A NAME="static-route-weight"></A> weight <I>switch</I></CODE><DD><P>For multipath routes, this value specifies a relative weight of the
+nexthop. Allowed values are 1-256. Default value is 1.
+</DL>
 <P>
 <H3>Route Origin Authorization</H3>
 
@@ -3379,20 +3481,6 @@ protocol static {
 <P>
 <DL>
 <DT><CODE>
-<A NAME="static-route-bfd"></A> bfd <I>switch</I></CODE><DD><P>The Static protocol could use BFD protocol for next hop liveness
-detection. If enabled, a BFD session to the route next hop is created
-and the static route is BFD-controlled -- the static route is announced
-only if the next hop liveness is confirmed by BFD. If the BFD session
-fails, the static route is removed. Note that this is a bit different
-compared to other protocols, which may use BFD as an advisory mechanism
-for fast failure detection but ignores it if a BFD session is not even
-established.
-<P>This option can be used for static routes with a direct next hop, or
-also for for individual next hops in a static multipath route (see
-above). Note that BFD protocol also has to be configured, see
-<A HREF="#bfd">BFD</A> section for details. Default value is no.
-<P>
-<DT><CODE>
 <A NAME="static-route-filter"></A> <I>filter expression</I></CODE><DD><P>This is a special option that allows filter expressions to be configured
 on per-route basis. Can be used multiple times. These expressions are
 evaluated when the route is originated, similarly to the import filter
@@ -3401,7 +3489,7 @@ attributes, e.g., <CODE>ospf_metric1 = 100;</CODE> for a route that will be
 exported to the OSPF protocol.
 </DL>
 <P>
-<H3>Example static config</H3>
+<H3><A NAME="static-example"></A> Example static configs</H3>
 
 <P>
 <HR>
@@ -3414,16 +3502,29 @@ protocol static {
                 via 198.51.100.10 weight 2
                 via 198.51.100.20 bfd   # BFD-controlled next hop
                 via 192.0.2.1;
-        route 203.0.113.0/24 unreachable; # Sink route
+        route 203.0.113.0/24 blackhole; # Sink route
         route 10.2.0.0/24 via "arc0";   # Secondary network
         route 192.168.10.0/24 via 198.51.100.100 {
                 ospf_metric1 = 20;      # Set extended attribute
-        }
-        route 192.168.10.0/24 via 198.51.100.100 {
+        };
+        route 192.168.11.0/24 via 198.51.100.100 {
                 ospf_metric2 = 100;     # Set extended attribute
                 ospf_tag = 2;           # Set extended attribute
-                bfd;                    # BFD-controlled route
-        }
+        };
+        route 192.168.12.0/24 via 198.51.100.100 {
+                bgp_community.add((65535, 65281));      # Set extended BGP attribute
+                bgp_large_community.add((64512, 1, 1)); # Set extended BGP attribute
+        };
+}
+
+protocol static {
+        ipv6;                                           # Channel is mandatory
+        route 2001:db8:10::/48 via 2001:db8:1::1;       # Route with global nexthop
+        route 2001:db8:20::/48 via fe80::10%eth0;       # Route with link-local nexthop
+        route 2001:db8:30::/48 via fe80::20%'eth1.60';  # Iface with non-alphanumeric characters
+        route 2001:db8:40::/48 via "eth2";              # Direct route to eth2
+        route 2001:db8::/32 unreachable;                # Unreachable route
+        route ::/0 via 2001:db8:1::1 bfd;               # BFD-controlled default route
 }
 </PRE>
 <HR>

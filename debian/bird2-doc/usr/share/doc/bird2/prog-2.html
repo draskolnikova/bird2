@@ -390,38 +390,43 @@ of <B>old_attrs</B> reference obtained by <B>rte_make_tmp_attrs()</B>.
 <HR><H3>Function</H3>
 <P><I>void</I>
 <B>rte_announce</B>
-(<I>rtable *</I> <B>tab</B>, <I>unsigned</I> <B>type</B>, <I>net *</I> <B>net</B>, <I>rte *</I> <B>new</B>, <I>rte *</I> <B>old</B>, <I>rte *</I> <B>new_best</B>, <I>rte *</I> <B>old_best</B>, <I>rte *</I> <B>before_old</B>) --     announce a routing table change
+(<I>rtable *</I> <B>tab</B>, <I>uint</I> <B>type</B>, <I>net *</I> <B>net</B>, <I>rte *</I> <B>new</B>, <I>rte *</I> <B>old</B>, <I>rte *</I> <B>new_best</B>, <I>rte *</I> <B>old_best</B>) --     announce a routing table change
 <P>
 <H3>Arguments</H3>
 <P>
 <DL>
 <DT><I>rtable *</I> <B>tab</B><DD><P>table the route has been added to
-<DT><I>unsigned</I> <B>type</B><DD><P>type of route announcement (RA_OPTIMAL or RA_ANY)
+<DT><I>uint</I> <B>type</B><DD><P>type of route announcement (RA_UNDEF or RA_ANY)
 <DT><I>net *</I> <B>net</B><DD><P>network in question
-<DT><I>rte *</I> <B>new</B><DD><P>the new route to be announced
-<DT><I>rte *</I> <B>old</B><DD><P>the previous route for the same network
+<DT><I>rte *</I> <B>new</B><DD><P>the new or changed route
+<DT><I>rte *</I> <B>old</B><DD><P>the previous route replaced by the new one
 <DT><I>rte *</I> <B>new_best</B><DD><P>the new best route for the same network
 <DT><I>rte *</I> <B>old_best</B><DD><P>the previous best route for the same network
-<DT><I>rte *</I> <B>before_old</B><DD><P>The previous route before <B>old</B> for the same network.
-If <B>before_old</B> is NULL <B>old</B> was the first.
 </DL>
 <H3>Description</H3>
-<P>This function gets a routing table update and announces it
-to all protocols that acccepts given type of route announcement
-and are connected to the same table by their announcement hooks.
-<P>Route announcement of type <I>RA_OPTIMAL</I> si generated when optimal
-route (in routing table <B>tab</B>) changes. In that case <B>old</B> stores the
-old optimal route.
-<P>Route announcement of type <I>RA_ANY</I> si generated when any route (in
-routing table <B>tab</B>) changes In that case <B>old</B> stores the old route
-from the same protocol.
-<P>For each appropriate protocol, we first call its <B>preexport()</B>
-hook which performs basic checks on the route (each protocol has a
-right to veto or force accept of the route before any filter is
-asked) and adds default values of attributes specific to the new
-protocol (metrics, tags etc.).  Then it consults the protocol's
-export filter and if it accepts the route, the <B>rt_notify()</B> hook of
-the protocol gets called.
+<P>This function gets a routing table update and announces it to all protocols
+that are connected to the same table by their channels.
+<P>There are two ways of how routing table changes are announced. First, there
+is a change of just one route in <B>net</B> (which may caused a change of the best
+route of the network). In this case <B>new</B> and <B>old</B> describes the changed route
+and <B>new_best</B> and <B>old_best</B> describes best routes. Other routes are not
+affected, but in sorted table the order of other routes might change.
+<P>Second, There is a bulk change of multiple routes in <B>net</B>, with shared best
+route selection. In such case separate route changes are described using
+<B>type</B> of <I>RA_ANY</I>, with <B>new</B> and <B>old</B> specifying the changed route, while
+<B>new_best</B> and <B>old_best</B> are NULL. After that, another notification is done
+where <B>new_best</B> and <B>old_best</B> are filled (may be the same), but <B>new</B> and <B>old</B>
+are NULL.
+<P>The function announces the change to all associated channels. For each
+channel, an appropriate preprocessing is done according to channel <I>ra_mode</I>.
+For example, <I>RA_OPTIMAL</I> channels receive just changes of best routes.
+<P>In general, we first call <B>preexport()</B> hook of a protocol, which performs
+basic checks on the route (each protocol has a right to veto or force accept
+of the route before any filter is asked). Then we consult an export filter
+of the channel and verify the old route in an export map of the channel.
+Finally, the <B>rt_notify()</B> hook of the protocol gets called.
+<P>Note that there are also calls of <B>rt_notify()</B> hooks due to feed, but that is
+done outside of scope of <B>rte_announce()</B>.
 
 
 <HR><H3>Function</H3>
@@ -940,13 +945,13 @@ by calling <B>ea_sort()</B>.
 <HR><H3>Function</H3>
 <P><I>void</I>
 <B>ea_show</B>
-(<I>struct cli *</I> <B>c</B>, <I>eattr *</I> <B>e</B>) --     print an <I>eattr</I> to CLI
+(<I>struct cli *</I> <B>c</B>, <I>const eattr *</I> <B>e</B>) --     print an <I>eattr</I> to CLI
 <P>
 <H3>Arguments</H3>
 <P>
 <DL>
 <DT><I>struct cli *</I> <B>c</B><DD><P>destination CLI
-<DT><I>eattr *</I> <B>e</B><DD><P>attribute to be printed
+<DT><I>const eattr *</I> <B>e</B><DD><P>attribute to be printed
 </DL>
 <H3>Description</H3>
 <P>This function takes an extended attribute represented by its <I>eattr</I>
@@ -2134,12 +2139,12 @@ if no such structure exists.
 <HR><H3>Function</H3>
 <P><I>struct iface *</I>
 <B>if_find_by_name</B>
-(<I>char *</I> <B>name</B>) --     find interface by name
+(<I>const char *</I> <B>name</B>) --     find interface by name
 <P>
 <H3>Arguments</H3>
 <P>
 <DL>
-<DT><I>char *</I> <B>name</B><DD><P>interface name
+<DT><I>const char *</I> <B>name</B><DD><P>interface name
 </DL>
 <H3>Description</H3>
 <P>This function finds an <I>iface</I> structure corresponding to an interface
@@ -2334,7 +2339,7 @@ neighbor entries connected to this interface are notified.
 
 <HR><H3>Function</H3>
 <P><I>void</I>
-<B>neigh_ifa_update</B>
+<B>neigh_ifa_up</B>
 (<I>struct ifa *</I> <B>a</B>)
 <H3>Arguments</H3>
 <P>

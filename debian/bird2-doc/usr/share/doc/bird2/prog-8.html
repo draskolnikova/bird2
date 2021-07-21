@@ -437,6 +437,22 @@ Slab and returns a pointer to the object.
 
 
 <HR><H3>Function</H3>
+<P><I>void *</I>
+<B>sl_allocz</B>
+(<I>slab *</I> <B>s</B>) --     allocate an object from Slab and zero it
+<P>
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>slab *</I> <B>s</B><DD><P>slab
+</DL>
+<H3>Description</H3>
+<P><B>sl_allocz()</B> allocates space for a single object from the
+Slab and returns a pointer to the object after zeroing out
+the object memory.
+
+
+<HR><H3>Function</H3>
 <P><I>void</I>
 <B>sl_free</B>
 (<I>slab *</I> <B>s</B>, <I>void *</I> <B>oo</B>) --     return a free object back to a Slab
@@ -525,6 +541,23 @@ list <B>l</B> which can be run by calling <B>ev_run_list()</B>.
 <P>This function schedules an event by enqueueing it to a system-wide
 event list which is run by the platform dependent code whenever
 appropriate.
+
+
+<HR><H3>Function</H3>
+<P><I>void</I>
+<B>ev_schedule_work</B>
+(<I>event *</I> <B>e</B>) --     schedule a work-event.
+<P>
+<H3>Arguments</H3>
+<P>
+<DL>
+<DT><I>event *</I> <B>e</B><DD><P>an event
+</DL>
+<H3>Description</H3>
+<P>This function schedules an event by enqueueing it to a system-wide work-event
+list which is run by the platform dependent code whenever appropriate. This
+is designated for work-events instead of regular events. They are executed
+less often in order to not clog I/O loop.
 
 
 <HR><H3>Function</H3>
